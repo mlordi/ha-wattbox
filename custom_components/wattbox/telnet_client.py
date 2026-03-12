@@ -533,7 +533,8 @@ class WattboxTelnetClient:
         # Initialize outlet info if not already done
         if not self._device_data["outlet_info"]:
             self._device_data["outlet_info"] = [
-                {"state": 0, "name": f"Outlet {i + 1}"} for i in range(num_outlets)
+                {"state": 0, "name": f"Outlet {i + 1}", "mode": 0}
+                for i in range(num_outlets)
             ]
 
         await self._get_outlet_states()
@@ -634,6 +635,12 @@ class WattboxTelnetClient:
         try:
             await self.async_send_command(command)
             _LOGGER.debug("Set outlet %d mode to %d", outlet_number, mode)
+
+            if 1 <= outlet_number <= len(self._device_data["outlet_info"]):
+                self._device_data["outlet_info"][outlet_number - 1]["mode"] = mode
+                _LOGGER.debug(
+                    "Updated internal mode for outlet %d to %d", outlet_number, mode
+                )
         except Exception as e:
             _LOGGER.error("Failed to set outlet %d mode: %s", outlet_number, e)
             raise
