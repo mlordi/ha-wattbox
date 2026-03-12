@@ -63,6 +63,20 @@ async def async_setup_entry(
     ]
 
     outlet_info = coordinator.data.get("outlet_info", []) if coordinator.data else []
+    if not outlet_info:
+        outlet_count = (
+            coordinator.data.get("outlet_count", 12) if coordinator.data else 12
+        )
+        outlet_info = [
+            {
+                "name": config_entry.options.get(
+                    f"outlet_{i + 1}_name", f"Outlet {i + 1}"
+                ),
+                "mode": int(config_entry.options.get(f"outlet_{i + 1}_mode", 0)),
+                "power": None,
+            }
+            for i in range(outlet_count)
+        ]
     always_on_sensors = [
         WattboxOutletAlwaysOnSensor(
             coordinator=coordinator,
