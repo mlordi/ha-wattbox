@@ -157,15 +157,19 @@ class WattboxOptionsFlow(config_entries.OptionsFlow):
     def _build_options_schema(self) -> vol.Schema:
         """Build dynamic options schema with per-outlet mode and name."""
         coordinator = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
-        outlet_info = coordinator.data.get("outlet_info", []) if coordinator and coordinator.data else []
+        outlet_info = (
+            coordinator.data.get("outlet_info", [])
+            if coordinator and coordinator.data
+            else []
+        )
         if not outlet_info:
             outlet_info = [{"name": f"Outlet {i + 1}", "mode": 0} for i in range(18)]
 
         schema_fields: dict[Any, Any] = {}
         for i, outlet in enumerate(outlet_info, start=1):
-            current_name = outlet.get(
-                "name",
-                self._config_entry.options.get(f"outlet_{i}_name", f"Outlet {i}"),
+            current_name = self._config_entry.options.get(
+                f"outlet_{i}_name",
+                outlet.get("name", f"Outlet {i}"),
             )
             current_mode = outlet.get(
                 "mode",
@@ -187,19 +191,34 @@ class WattboxOptionsFlow(config_entries.OptionsFlow):
 
         outlet_info = coordinator.data.get("outlet_info", [])
         for i, outlet in enumerate(outlet_info, start=1):
-            new_name = str(user_input.get(f"outlet_{i}_name", outlet.get("name", ""))).strip()
+            new_name = str(
+                user_input.get(
+                    f"outlet_{i}_name",
+                    self._config_entry.options.get(
+                        f"outlet_{i}_name", outlet.get("name", "")
+                    ),
+                )
+            ).strip()
             new_mode = int(user_input.get(f"outlet_{i}_mode", outlet.get("mode", 0)))
 
-            current_name = str(outlet.get("name", "")).strip()
+            current_name = str(
+                self._config_entry.options.get(
+                    f"outlet_{i}_name", outlet.get("name", "")
+                )
+            ).strip()
             current_mode = int(outlet.get("mode", 0))
 
             if new_name and new_name != current_name:
-                await coordinator.telnet_client.async_set_outlet_name(i, new_name)
+                # Device protocol does not reliably accept spaces in names.
+                # Keep display names in options and send a device-safe version.
+                device_name = new_name.replace(" ", "_")
+                await coordinator.async_set_outlet_name(i, device_name)
 
             if new_mode != current_mode:
-                await coordinator.telnet_client.async_set_outlet_mode(i, new_mode)
+                await coordinator.async_set_outlet_mode(i, new_mode)
 
         await coordinator.async_request_refresh()
+        await self.hass.config_entries.async_reload(self._config_entry.entry_id)
 
 
 class CannotConnect(HomeAssistantError):

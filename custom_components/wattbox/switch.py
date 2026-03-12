@@ -26,7 +26,9 @@ def _create_outlet_switches(
 ) -> list[WattboxSwitch]:
     """Create WattboxSwitch instances for outlets."""
     switches = []
-    for i, _outlet in enumerate(outlet_info):
+    for i, outlet in enumerate(outlet_info):
+        if outlet.get("mode", 0) == 2:
+            continue
         switch = WattboxSwitch(
             coordinator=coordinator,
             device_info=(
@@ -106,6 +108,11 @@ class WattboxSwitch(WattboxOutletEntity, SwitchEntity):
     @property
     def name(self) -> str | None:
         """Return the name of the switch."""
+        configured_name = self.coordinator.config_entry.options.get(
+            f"outlet_{self._outlet_number}_name"
+        )
+        if configured_name:
+            return configured_name
         if not self.coordinator.data:
             return self._attr_name
         outlet_info = self.coordinator.data.get("outlet_info", [])
