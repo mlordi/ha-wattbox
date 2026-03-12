@@ -270,20 +270,21 @@ class WattboxOutletAlwaysOnSensor(WattboxOutletEntity, SensorEntity):
     @property
     def name(self) -> str | None:
         """Return the sensor name."""
+        prefix = f"{self._outlet_number:02d} "
         configured_name = self.coordinator.config_entry.options.get(
             f"outlet_{self._outlet_number}_name"
         )
         if configured_name:
-            return f"{configured_name} Status"
+            return f"{prefix}{configured_name} Status"
         if not self.coordinator.data:
-            return self._attr_name
+            return f"{prefix}{self._attr_name}"
         outlet_info = self.coordinator.data.get("outlet_info", [])
         if self._outlet_number <= len(outlet_info):
             outlet_name = outlet_info[self._outlet_number - 1].get(
                 "name", f"Outlet {self._outlet_number}"
             )
-            return f"{outlet_name} Status"
-        return self._attr_name
+            return f"{prefix}{outlet_name} Status"
+        return f"{prefix}{self._attr_name}"
 
     @property
     def native_value(self) -> str | None:
