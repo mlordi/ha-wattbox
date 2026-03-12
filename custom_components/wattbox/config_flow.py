@@ -151,7 +151,8 @@ class WattboxOptionsFlow(config_entries.OptionsFlow):
                 step_id="init", data_schema=self._build_options_schema()
             )
 
-        await self._apply_outlet_settings(user_input)
+        outlet_count = await self._apply_outlet_settings(user_input)
+        user_input["outlet_count"] = outlet_count
         return self.async_create_entry(title="", data=user_input)
 
     def _build_options_schema(self) -> vol.Schema:
@@ -163,7 +164,10 @@ class WattboxOptionsFlow(config_entries.OptionsFlow):
             else []
         )
         if not outlet_info:
-            outlet_info = [{"name": f"Outlet {i + 1}", "mode": 0} for i in range(18)]
+            outlet_count = int(self._config_entry.options.get("outlet_count", 12))
+            outlet_info = [
+                {"name": f"Outlet {i + 1}", "mode": 0} for i in range(outlet_count)
+            ]
 
         schema_fields: dict[Any, Any] = {}
         for i, outlet in enumerate(outlet_info, start=1):
@@ -186,11 +190,11 @@ class WattboxOptionsFlow(config_entries.OptionsFlow):
 
         return vol.Schema(schema_fields)
 
-    async def _apply_outlet_settings(self, user_input: dict[str, Any]) -> None:
+    async def _apply_outlet_settings(self, user_input: dict[str, Any]) -> int:
         """Apply changed outlet names and modes to device."""
         coordinator = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
         if not coordinator or not coordinator.data:
-            return
+            return int(self._config_entry.options.get("outlet_count", 12))
 
         outlet_info = coordinator.data.get("outlet_info", [])
         for i, outlet in enumerate(outlet_info, start=1):
@@ -233,6 +237,7 @@ class WattboxOptionsFlow(config_entries.OptionsFlow):
 
         await coordinator.async_request_refresh()
         await self.hass.config_entries.async_reload(self._config_entry.entry_id)
+        return len(outlet_info)
 
 
 class CannotConnect(HomeAssistantError):
