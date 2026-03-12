@@ -88,6 +88,11 @@ class WattboxOutletResetButton(WattboxOutletEntity, ButtonEntity):
     @property
     def name(self) -> str | None:
         """Return the name of the reset button."""
+        configured_name = self.coordinator.config_entry.options.get(
+            f"outlet_{self._outlet_number}_name"
+        )
+        if configured_name:
+            return f"{configured_name} Reset"
         if not self.coordinator.data:
             return self._attr_name
         outlet_info = self.coordinator.data.get("outlet_info", [])
