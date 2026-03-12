@@ -8,6 +8,7 @@ import pytest
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from custom_components.wattbox.switch import (
@@ -27,11 +28,12 @@ def mock_config_entry() -> ConfigEntry:
         "password": "test_password",
         "polling_interval": 30,
     }
+    config_entry.options = {}
     return config_entry
 
 
 @pytest.fixture
-def mock_coordinator() -> DataUpdateCoordinator:
+def mock_coordinator(mock_config_entry: ConfigEntry) -> DataUpdateCoordinator:
     """Mock coordinator for testing."""
     coordinator = MagicMock(spec=DataUpdateCoordinator)
     coordinator.data = {
@@ -48,6 +50,7 @@ def mock_coordinator() -> DataUpdateCoordinator:
         ],
     }
     coordinator.async_set_outlet_state = AsyncMock()
+    coordinator.config_entry = mock_config_entry
     return coordinator
 
 
@@ -109,7 +112,7 @@ def test_wattbox_switch_init(
 
     assert switch.coordinator == mock_coordinator
     assert switch.unique_id == "test_switch_1"
-    assert switch.name == "Outlet 1"
+    assert switch.name == "01 Outlet 1"
     assert switch.device_class == "outlet"
     assert switch._outlet_number == 1
 
@@ -189,7 +192,7 @@ def test_wattbox_switch_attributes(
     )
 
     assert switch.device_class == "outlet"
-    assert switch.name == "Outlet 1"
+    assert switch.name == "01 Outlet 1"
 
 
 def test_switch_inheritance(
@@ -244,3 +247,78 @@ async def test_switch_coordinator_integration(
     # Test turning off
     await switch.async_turn_off()
     mock_coordinator.async_set_outlet_state.assert_called_with(1, False)
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_with_default_outlets_sync_add(
+    hass: HomeAssistant,
+    mock_config_entry: ConfigEntry,
+    mock_coordinator: DataUpdateCoordinator,
+) -> None:
+    """Test default outlet fallback and sync add_entities path."""
+    mock_coordinator.data = {"outlet_count": 2, "outlet_info": []}
+    hass.data["wattbox"] = {mock_config_entry.entry_id: mock_coordinator}
+    entities_added = []
+
+    def mock_add_entities(entities):
+        entities_added.extend(entities)
+
+    await async_setup_entry(hass, mock_config_entry, mock_add_entities)
+    assert len(entities_added) == 2
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_with_none_add_entities(
+    hass: HomeAssistant,
+    mock_config_entry: ConfigEntry,
+) -> None:
+    """Test guard when add_entities callback is None."""
+    hass.data["wattbox"] = {mock_config_entry.entry_id: MagicMock()}
+    await async_setup_entry(hass, mock_config_entry, None)
+
+
+def test_switch_name_fallback_without_options(
+    mock_coordinator: DataUpdateCoordinator,
+) -> None:
+    """Test name fallback when config option is missing."""
+    mock_coordinator.config_entry.options = {}
+    switch = WattboxSwitch(
+        coordinator=mock_coordinator,
+        device_info={},
+        unique_id="test_switch_2",
+        outlet_number=2,
+    )
+    assert switch.name == "02 Outlet 2"
+
+
+def test_switch_available_false_when_not_enabled(
+    mock_coordinator: DataUpdateCoordinator,
+) -> None:
+    """Switch should be unavailable for non-enabled mode."""
+    mock_coordinator.data["outlet_info"][0]["mode"] = 2
+    switch = WattboxSwitch(
+        coordinator=mock_coordinator,
+        device_info={},
+        unique_id="test_switch_1",
+        outlet_number=1,
+    )
+    assert switch.available is False
+
+
+@pytest.mark.asyncio
+async def test_switch_turn_on_off_raise_when_not_enabled(
+    mock_coordinator: DataUpdateCoordinator,
+) -> None:
+    """Switch on/off should raise when outlet mode is not enabled."""
+    mock_coordinator.data["outlet_info"][0]["mode"] = 1
+    switch = WattboxSwitch(
+        coordinator=mock_coordinator,
+        device_info={},
+        unique_id="test_switch_1",
+        outlet_number=1,
+    )
+
+    with pytest.raises(HomeAssistantError):
+        await switch.async_turn_on()
+    with pytest.raises(HomeAssistantError):
+        await switch.async_turn_off()

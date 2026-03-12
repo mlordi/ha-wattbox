@@ -14,8 +14,8 @@ from .const import (
     TELNET_CMD_HOSTNAME,
     TELNET_CMD_MODEL,
     TELNET_CMD_OUTLET_COUNT,
-    TELNET_CMD_OUTLET_MODE_SET,
     TELNET_CMD_OUTLET_MODE,
+    TELNET_CMD_OUTLET_MODE_SET,
     TELNET_CMD_OUTLET_NAME,
     TELNET_CMD_OUTLET_NAME_SET,
     TELNET_CMD_OUTLET_SET,
@@ -623,7 +623,9 @@ class WattboxTelnetClient:
                     response,
                 )
         except Exception as e:
-            _LOGGER.debug("Failed to get outlet modes (using existing mode data): %s", e)
+            _LOGGER.debug(
+                "Failed to get outlet modes (using existing mode data): %s", e
+            )
 
     async def async_set_outlet_state(self, outlet_number: int, state: bool) -> None:
         """Set outlet state (on/off)."""

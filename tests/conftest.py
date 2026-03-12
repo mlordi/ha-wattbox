@@ -30,12 +30,17 @@ except ImportError:
     )
     sys.modules["homeassistant.components.sensor"] = homeassistant.components.sensor
     sys.modules["homeassistant.components.switch"] = homeassistant.components.switch
+    sys.modules["homeassistant.components.select"] = homeassistant.components.select
+    sys.modules["homeassistant.components.button"] = homeassistant.components.button
     # Add missing modules that our code imports
     sys.modules["homeassistant.const"] = homeassistant.const
     sys.modules["homeassistant.helpers"] = homeassistant.helpers
     sys.modules["homeassistant.helpers.frame"] = homeassistant.helpers.frame
     sys.modules["homeassistant.helpers.entity_platform"] = (
         homeassistant.helpers.entity_platform
+    )
+    sys.modules["homeassistant.helpers.entity_registry"] = (
+        homeassistant.helpers.entity_registry
     )
     # Add external dependencies
     sys.modules["voluptuous"] = voluptuous
@@ -80,8 +85,14 @@ async def hass() -> HomeAssistant:
     hass.config_entries = MagicMock()
     hass.config_entries.async_unload_platforms = AsyncMock(return_value=True)
     hass.config_entries.async_forward_entry_setups = AsyncMock(return_value=None)
+    hass.config_entries.async_update_entry = MagicMock()
+    hass.config_entries.async_reload = AsyncMock(return_value=True)
     hass.entity_registry = MagicMock()
     hass.device_registry = MagicMock()
+    hass.services = MagicMock()
+    hass.services.has_service = MagicMock(return_value=False)
+    hass.services.async_register = MagicMock()
+    hass.services.async_remove = MagicMock()
 
     # Mock the config entries flow
     hass.config_entries.flow = MagicMock()

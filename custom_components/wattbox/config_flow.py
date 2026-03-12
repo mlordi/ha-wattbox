@@ -184,8 +184,8 @@ class WattboxOptionsFlow(config_entries.OptionsFlow):
             )
 
             schema_fields[vol.Optional(f"outlet_{i}_name", default=current_name)] = str
-            schema_fields[vol.Optional(f"outlet_{i}_mode", default=current_mode)] = vol.In(
-                {0: "Enabled", 1: "Disabled", 2: "Reset Only"}
+            schema_fields[vol.Optional(f"outlet_{i}_mode", default=current_mode)] = (
+                vol.In({0: "Enabled", 1: "Disabled", 2: "Reset Only"})
             )
 
         return vol.Schema(schema_fields)

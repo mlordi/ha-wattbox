@@ -24,8 +24,8 @@ from .const import (
     SERVICE_ATTR_OUTLET_NUMBER,
     SERVICE_ATTR_STATE,
     SERVICE_RESET_OUTLET,
-    SERVICE_SET_OUTLET_STATE,
     SERVICE_SET_OUTLET_MODE,
+    SERVICE_SET_OUTLET_STATE,
     SERVICE_TOGGLE_OUTLET,
 )
 from .coordinator import WattboxDataUpdateCoordinator
@@ -117,7 +117,9 @@ def _cleanup_stale_entities(
             entity_registry.async_remove(entity_entry.entity_id)
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(  # noqa: C901
+    hass: HomeAssistant, entry: ConfigEntry
+) -> bool:
     """Set up Wattbox from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
