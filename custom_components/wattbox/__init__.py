@@ -9,6 +9,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CONF_HOST,
@@ -36,6 +37,51 @@ PLATFORMS: list[Platform] = [
 ]
 
 
+def _stale_unique_ids_for_entry(
+    entry_id: str,
+    outlet_info: list[dict],
+) -> set[str]:
+    """Build list of stale unique_ids to remove from entity registry."""
+    stale_unique_ids: set[str] = set()
+
+    # Remove all old mode select entities (mode is now configured in Options Flow).
+    for i in range(1, len(outlet_info) + 1):
+        stale_unique_ids.add(f"{entry_id}_outlet_{i}_mode")
+
+    # Keep entity set aligned to outlet mode:
+    # mode 0: switch + reset button, no always-on status
+    # mode 1: no switch/button, show always-on status
+    # mode 2: no switch, show reset button, no always-on status
+    for i, outlet in enumerate(outlet_info, start=1):
+        mode = outlet.get("mode", 0)
+        if mode in (1, 2):
+            stale_unique_ids.add(f"{entry_id}_outlet_{i}")
+        if mode == 1:
+            stale_unique_ids.add(f"{entry_id}_outlet_{i}_reset")
+        if mode in (0, 2):
+            stale_unique_ids.add(f"{entry_id}_outlet_{i}_always_on")
+
+    return stale_unique_ids
+
+
+def _cleanup_stale_entities(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    outlet_info: list[dict],
+) -> None:
+    """Remove stale entities from HA entity registry."""
+    entity_registry = er.async_get(hass)
+    stale_unique_ids = _stale_unique_ids_for_entry(entry.entry_id, outlet_info)
+    if not stale_unique_ids:
+        return
+
+    for entity_entry in list(entity_registry.entities.values()):
+        if entity_entry.config_entry_id != entry.entry_id:
+            continue
+        if entity_entry.unique_id in stale_unique_ids:
+            entity_registry.async_remove(entity_entry.entity_id)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Wattbox from a config entry."""
     hass.data.setdefault(DOMAIN, {})
@@ -55,6 +101,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Store coordinator
     hass.data[DOMAIN][entry.entry_id] = coordinator
+
+    outlet_info = coordinator.data.get("outlet_info", []) if coordinator.data else []
+    _cleanup_stale_entities(hass, entry, outlet_info)
 
     if not hass.services.has_service(DOMAIN, SERVICE_SET_OUTLET_MODE):
         service_schema = vol.Schema(
@@ -81,6 +130,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 )
 
             await coordinator_for_entry.async_set_outlet_mode(outlet_number, mode)
+            await hass.config_entries.async_reload(entry_id)
 
         hass.services.async_register(
             DOMAIN,

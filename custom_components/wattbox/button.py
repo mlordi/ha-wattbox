@@ -25,7 +25,9 @@ def _create_outlet_reset_buttons(
 ) -> list["WattboxOutletResetButton"]:
     """Create reset button entities for outlets."""
     buttons = []
-    for i, _outlet in enumerate(outlet_info):
+    for i, outlet in enumerate(outlet_info):
+        if outlet.get("mode", 0) == 1:
+            continue
         button = WattboxOutletResetButton(
             coordinator=coordinator,
             device_info=(

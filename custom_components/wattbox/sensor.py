@@ -13,7 +13,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import WattboxDataUpdateCoordinator
-from .entity import WattboxDeviceEntity
+from .entity import WattboxDeviceEntity, WattboxOutletEntity
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,9 +48,20 @@ async def async_setup_entry(
         WattboxPowerSensor(coordinator, config_entry.entry_id),
     ]
 
+    outlet_info = coordinator.data.get("outlet_info", []) if coordinator.data else []
+    always_on_sensors = [
+        WattboxOutletAlwaysOnSensor(
+            coordinator=coordinator,
+            entry_id=config_entry.entry_id,
+            outlet_number=i + 1,
+        )
+        for i, outlet in enumerate(outlet_info)
+        if outlet.get("mode", 0) == 1
+    ]
+
     # Combine all sensors and filter out any None sensors
     # v0.2.10: Enhanced safety to prevent NoneType errors
-    all_sensors = sensors + power_sensors
+    all_sensors = sensors + power_sensors + always_on_sensors
     valid_sensors = []
     for sensor in all_sensors:
         if sensor is not None:
@@ -222,3 +233,51 @@ class WattboxPowerSensor(WattboxDeviceEntity, SensorEntity):
         if not self.coordinator.data:
             return None
         return self.coordinator.data.get("power")
+
+
+class WattboxOutletAlwaysOnSensor(WattboxOutletEntity, SensorEntity):
+    """Representation of a Wattbox outlet always-on status sensor."""
+
+    def __init__(
+        self,
+        coordinator: WattboxDataUpdateCoordinator,
+        entry_id: str,
+        outlet_number: int,
+    ) -> None:
+        """Initialize the always-on outlet sensor."""
+        super().__init__(
+            coordinator,
+            {},
+            f"{entry_id}_outlet_{outlet_number}_always_on",
+            outlet_number,
+        )
+        self._attr_name = f"Outlet {outlet_number} Status"
+
+    @property
+    def name(self) -> str | None:
+        """Return the sensor name."""
+        configured_name = self.coordinator.config_entry.options.get(
+            f"outlet_{self._outlet_number}_name"
+        )
+        if configured_name:
+            return f"{configured_name} Status"
+        if not self.coordinator.data:
+            return self._attr_name
+        outlet_info = self.coordinator.data.get("outlet_info", [])
+        if self._outlet_number <= len(outlet_info):
+            outlet_name = outlet_info[self._outlet_number - 1].get(
+                "name", f"Outlet {self._outlet_number}"
+            )
+            return f"{outlet_name} Status"
+        return self._attr_name
+
+    @property
+    def native_value(self) -> str | None:
+        """Return outlet control status."""
+        if not self.coordinator.data:
+            return None
+        outlet_info = self.coordinator.data.get("outlet_info", [])
+        if self._outlet_number <= len(outlet_info):
+            if outlet_info[self._outlet_number - 1].get("mode", 0) == 1:
+                return "Always On"
+        return None
