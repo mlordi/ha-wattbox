@@ -123,19 +123,21 @@ class WattboxSwitch(WattboxOutletEntity, SwitchEntity):
     @property
     def name(self) -> str | None:
         """Return the name of the switch."""
+        prefix = f"{self._outlet_number:02d} "
         configured_name = self.coordinator.config_entry.options.get(
             f"outlet_{self._outlet_number}_name"
         )
         if configured_name:
-            return configured_name
+            return f"{prefix}{configured_name}"
         if not self.coordinator.data:
-            return self._attr_name
+            return f"{prefix}{self._attr_name}"
         outlet_info = self.coordinator.data.get("outlet_info", [])
         if self._outlet_number <= len(outlet_info):
-            return outlet_info[self._outlet_number - 1].get(
+            outlet_name = outlet_info[self._outlet_number - 1].get(
                 "name", f"Outlet {self._outlet_number}"
             )
-        return self._attr_name
+            return f"{prefix}{outlet_name}"
+        return f"{prefix}{self._attr_name}"
 
     @property
     def is_on(self) -> bool | None:
