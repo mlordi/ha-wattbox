@@ -44,6 +44,7 @@ HTTP_ENDPOINT_MAIN: Final[str] = "/"
 
 # Telnet control commands
 TELNET_CMD_OUTLET_SET: Final[str] = "!OutletSet"
+TELNET_CMD_OUTLET_MODE_SET: Final[str] = "!OutletModeSet"
 
 # Telnet prompts
 TELNET_USERNAME_PROMPT: Final[str] = "Username: "
@@ -63,3 +64,14 @@ ATTR_FIRMWARE: Final[str] = "firmware"
 ATTR_MODEL: Final[str] = "model"
 ATTR_SERIAL: Final[str] = "serial"
 ATTR_HOSTNAME: Final[str] = "hostname"
+
+# Services
+SERVICE_SET_OUTLET_MODE: Final[str] = "set_outlet_mode"
+SERVICE_ATTR_ENTRY_ID: Final[str] = "entry_id"
+SERVICE_ATTR_OUTLET_NUMBER: Final[str] = "outlet_number"
+SERVICE_ATTR_MODE: Final[str] = "mode"
+
+# Outlet modes
+OUTLET_MODE_ENABLED: Final[int] = 0
+OUTLET_MODE_DISABLED: Final[int] = 1
+OUTLET_MODE_RESET_ONLY: Final[int] = 2
