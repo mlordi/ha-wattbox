@@ -15,6 +15,7 @@ from .const import (
     TELNET_CMD_MODEL,
     TELNET_CMD_OUTLET_COUNT,
     TELNET_CMD_OUTLET_MODE_SET,
+    TELNET_CMD_OUTLET_MODE,
     TELNET_CMD_OUTLET_NAME,
     TELNET_CMD_OUTLET_NAME_SET,
     TELNET_CMD_OUTLET_SET,
@@ -540,6 +541,7 @@ class WattboxTelnetClient:
 
         await self._get_outlet_states()
         await self._get_outlet_names()
+        await self._get_outlet_modes()
 
         return self._device_data["outlet_info"]
 
@@ -596,6 +598,32 @@ class WattboxTelnetClient:
                 _LOGGER.warning("No valid outlet names response found: %s", response)
         except Exception as e:
             _LOGGER.warning("Failed to get outlet names: %s", e)
+
+    async def _get_outlet_modes(self) -> None:
+        """Get outlet modes."""
+        try:
+            response = await self.async_send_command(TELNET_CMD_OUTLET_MODE)
+            _LOGGER.debug("Outlet modes response: %s", response)
+
+            if "=" in response and "OutletMode" in response:
+                outlet_modes = response.split("=")[1].split(",")
+                _LOGGER.debug("Parsed outlet modes: %s", outlet_modes)
+
+                num_outlets = min(
+                    len(outlet_modes), len(self._device_data["outlet_info"])
+                )
+                for i in range(num_outlets):
+                    mode = int(outlet_modes[i])
+                    if mode in (0, 1, 2):
+                        self._device_data["outlet_info"][i]["mode"] = mode
+                        _LOGGER.debug("Set outlet %d mode to %d", i + 1, mode)
+            else:
+                _LOGGER.debug(
+                    "No valid outlet mode response found (command may be unsupported): %s",
+                    response,
+                )
+        except Exception as e:
+            _LOGGER.debug("Failed to get outlet modes (using existing mode data): %s", e)
 
     async def async_set_outlet_state(self, outlet_number: int, state: bool) -> None:
         """Set outlet state (on/off)."""
