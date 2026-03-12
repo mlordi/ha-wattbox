@@ -12,6 +12,7 @@ from custom_components.wattbox.config_flow import (
     CannotConnect,
     ConfigFlow,
     InvalidAuth,
+    WattboxOptionsFlow,
 )
 from custom_components.wattbox.const import (
     DEFAULT_PASSWORD,
@@ -243,3 +244,52 @@ def test_invalid_auth_exception() -> None:
     """Test InvalidAuth exception."""
     error = InvalidAuth("Test auth error")
     assert str(error) == "Test auth error"
+
+
+def test_get_options_flow() -> None:
+    """Test options flow factory."""
+    config_entry = AsyncMock()
+    flow = ConfigFlow.async_get_options_flow(config_entry)
+    assert isinstance(flow, WattboxOptionsFlow)
+
+
+@pytest.mark.asyncio
+async def test_options_flow_build_and_submit(hass: HomeAssistant) -> None:
+    """Test options flow schema build and apply."""
+    config_entry = AsyncMock()
+    config_entry.entry_id = "test_entry_id"
+    config_entry.options = {"outlet_count": 2}
+
+    flow = WattboxOptionsFlow(config_entry)
+    flow.hass = hass
+
+    coordinator = AsyncMock()
+    coordinator.data = {
+        "outlet_info": [
+            {"name": "Outlet 1", "mode": 0},
+            {"name": "Outlet 2", "mode": 1},
+        ]
+    }
+    coordinator.async_set_outlet_name = AsyncMock()
+    coordinator.async_set_outlet_mode = AsyncMock()
+    coordinator.async_request_refresh = AsyncMock()
+    hass.data["wattbox"] = {config_entry.entry_id: coordinator}
+
+    # Initial form render
+    result = await flow.async_step_init()
+    assert result["type"] == FlowResultType.FORM
+
+    # Submit changed values
+    result2 = await flow.async_step_init(
+        {
+            "outlet_1_name": "Rack Core",
+            "outlet_1_mode": 2,
+            "outlet_2_name": "Media",
+            "outlet_2_mode": 1,
+        }
+    )
+
+    assert result2["type"] == FlowResultType.CREATE_ENTRY
+    coordinator.async_set_outlet_name.assert_any_call(1, "Rack_Core")
+    coordinator.async_set_outlet_mode.assert_any_call(1, 2)
+    hass.config_entries.async_reload.assert_called_once_with(config_entry.entry_id)

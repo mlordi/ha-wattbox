@@ -62,6 +62,48 @@ async def test_async_setup_entry(
     assert all(isinstance(entity, WattboxOutletModeSelect) for entity in entities_added)
 
 
+@pytest.mark.asyncio
+async def test_async_setup_entry_default_outlets_sync_add(
+    hass: HomeAssistant,
+    mock_config_entry: ConfigEntry,
+    mock_coordinator: DataUpdateCoordinator,
+) -> None:
+    """Test default outlet fallback path."""
+    mock_coordinator.data = {"outlet_info": []}
+    hass.data["wattbox"] = {mock_config_entry.entry_id: mock_coordinator}
+    entities_added = []
+
+    def mock_add_entities(entities):
+        entities_added.extend(entities)
+
+    await async_setup_entry(hass, mock_config_entry, mock_add_entities)
+    assert len(entities_added) == 18
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_with_none_add_entities(
+    hass: HomeAssistant, mock_config_entry: ConfigEntry
+) -> None:
+    """Test guard when add_entities callback is None."""
+    hass.data["wattbox"] = {mock_config_entry.entry_id: MagicMock()}
+    await async_setup_entry(hass, mock_config_entry, None)
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_add_entities_exception(
+    hass: HomeAssistant,
+    mock_config_entry: ConfigEntry,
+    mock_coordinator: DataUpdateCoordinator,
+) -> None:
+    """Ensure add_entities exceptions are handled."""
+    hass.data["wattbox"] = {mock_config_entry.entry_id: mock_coordinator}
+
+    def bad_add_entities(_entities):
+        raise RuntimeError("boom")
+
+    await async_setup_entry(hass, mock_config_entry, bad_add_entities)
+
+
 def test_mode_select_current_option(
     mock_coordinator: DataUpdateCoordinator,
 ) -> None:
@@ -73,6 +115,20 @@ def test_mode_select_current_option(
     assert select_1.current_option == "Enabled"
     assert select_2.current_option == "Reset Only"
     assert select_3.current_option == "Disabled"
+
+    # Unknown mode falls back to Enabled
+    mock_coordinator.data["outlet_info"][0]["mode"] = 99
+    assert select_1.current_option == "Enabled"
+
+
+def test_mode_select_name_and_none_current_option(
+    mock_coordinator: DataUpdateCoordinator,
+) -> None:
+    """Test name rendering and no-data current option."""
+    select = WattboxOutletModeSelect(mock_coordinator, {}, "test_mode_1", 1)
+    assert select.name == "Outlet 1 Mode"
+    mock_coordinator.data = None
+    assert select.current_option is None
 
 
 @pytest.mark.asyncio

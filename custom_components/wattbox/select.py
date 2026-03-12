@@ -22,7 +22,9 @@ MODE_LABEL_TO_VALUE: dict[str, int] = {
     "Disabled": 1,
     "Reset Only": 2,
 }
-MODE_VALUE_TO_LABEL: dict[int, str] = {value: key for key, value in MODE_LABEL_TO_VALUE.items()}
+MODE_VALUE_TO_LABEL: dict[int, str] = {
+    value: key for key, value in MODE_LABEL_TO_VALUE.items()
+}
 
 
 def _create_outlet_mode_selects(

@@ -126,7 +126,7 @@ async def test_async_update_data_success(
     # Verify client methods were called
     mock_telnet_client.async_connect.assert_called_once()
     mock_telnet_client.async_get_device_info.assert_called_once()
-    mock_telnet_client.async_get_outlet_status.assert_called_once_with(18)
+    mock_telnet_client.async_get_outlet_status.assert_called_once_with()
     mock_telnet_client.async_get_status_info.assert_called_once()
 
 
@@ -201,6 +201,19 @@ async def test_async_set_outlet_mode(
 
 
 @pytest.mark.asyncio
+async def test_async_set_outlet_mode_error(
+    coordinator: WattboxDataUpdateCoordinator,
+    mock_telnet_client: WattboxTelnetClient,
+) -> None:
+    """Test setting outlet mode with error."""
+    mock_telnet_client.async_set_outlet_mode = AsyncMock(side_effect=Exception("boom"))
+    coordinator.async_request_refresh = AsyncMock()
+
+    with pytest.raises(Exception, match="boom"):
+        await coordinator.async_set_outlet_mode(1, 2)
+
+
+@pytest.mark.asyncio
 async def test_async_disconnect(
     coordinator: WattboxDataUpdateCoordinator,
     mock_telnet_client: WattboxTelnetClient,
@@ -209,6 +222,24 @@ async def test_async_disconnect(
     await coordinator.async_disconnect()
 
     mock_telnet_client.async_disconnect.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_async_reset_outlet_and_name(
+    coordinator: WattboxDataUpdateCoordinator,
+    mock_telnet_client: WattboxTelnetClient,
+) -> None:
+    """Test reset and set-name coordinator calls."""
+    mock_telnet_client.async_reset_outlet = AsyncMock()
+    mock_telnet_client.async_set_outlet_name = AsyncMock()
+    coordinator.async_request_refresh = AsyncMock()
+
+    await coordinator.async_reset_outlet(2)
+    await coordinator.async_set_outlet_name(2, "Rack_Core")
+
+    mock_telnet_client.async_reset_outlet.assert_called_once_with(2)
+    mock_telnet_client.async_set_outlet_name.assert_called_once_with(2, "Rack_Core")
+    assert coordinator.async_request_refresh.call_count == 2
 
 
 @pytest.mark.asyncio

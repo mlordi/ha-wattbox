@@ -127,6 +127,26 @@ class ConfigFlow:
         return FlowResult("test_flow", FlowResultType.ABORT, {"reason": reason})
 
 
+class OptionsFlow:
+    """Mock OptionsFlow class."""
+
+    def __init__(self, *args, **kwargs):
+        self.hass = None
+
+    def async_show_form(self, step_id, data_schema=None, errors=None):
+        """Mock async_show_form method."""
+        data = {"step_id": step_id}
+        if errors:
+            data["errors"] = errors
+        return FlowResult("test_flow", FlowResultType.FORM, data)
+
+    def async_create_entry(self, title, data):
+        """Mock async_create_entry method."""
+        data_with_title = data.copy()
+        data_with_title["title"] = title
+        return FlowResult("test_flow", FlowResultType.CREATE_ENTRY, data_with_title)
+
+
 class DeviceInfo:
     """Mock DeviceInfo class."""
 
@@ -220,6 +240,25 @@ class SwitchEntity:
     pass
 
 
+class SelectEntity:
+    """Mock SelectEntity class."""
+
+    pass
+
+
+class ButtonEntity:
+    """Mock ButtonEntity class."""
+
+    pass
+
+
+class ServiceCall:
+    """Mock ServiceCall class."""
+
+    def __init__(self, data: dict[str, Any] | None = None):
+        self.data = data or {}
+
+
 # Create mock modules
 class MockModule:
     """Mock module class."""
@@ -236,6 +275,7 @@ class Platform:
     BINARY_SENSOR = "binary_sensor"
     SENSOR = "sensor"
     SWITCH = "switch"
+    BUTTON = "button"
 
 
 class UnitOfElectricPotential:
@@ -295,6 +335,11 @@ class CoordinatorEntity:
         """Mock device_class property."""
         return self._attr_device_class
 
+    @property
+    def available(self):
+        """Mock available property."""
+        return True
+
 
 class MockVoluptuous:
     """Mock voluptuous module."""
@@ -304,10 +349,27 @@ class MockVoluptuous:
         return lambda *args, **kwargs: None
 
 
+class MockEntityRegistry:
+    """Mock entity registry."""
+
+    def __init__(self):
+        self.entities = {}
+
+    def async_remove(self, entity_id: str) -> None:
+        self.entities.pop(entity_id, None)
+
+
+def async_get_entity_registry(_hass: Any) -> MockEntityRegistry:
+    """Mock homeassistant.helpers.entity_registry.async_get."""
+    return MockEntityRegistry()
+
+
 # Mock the homeassistant module structure
 homeassistant = MockModule(
-    core=MockModule(HomeAssistant=HomeAssistant),
-    config_entries=MockModule(ConfigEntry=ConfigEntry, ConfigFlow=ConfigFlow),
+    core=MockModule(HomeAssistant=HomeAssistant, ServiceCall=ServiceCall),
+    config_entries=MockModule(
+        ConfigEntry=ConfigEntry, ConfigFlow=ConfigFlow, OptionsFlow=OptionsFlow
+    ),
     data_entry_flow=MockModule(FlowResultType=FlowResultType, FlowResult=FlowResult),
     exceptions=MockModule(HomeAssistantError=HomeAssistantError),
     const=MockModule(
@@ -327,11 +389,14 @@ homeassistant = MockModule(
         ),
         frame=MockFrame(),
         entity_platform=MockModule(AddEntitiesCallback=AddEntitiesCallback),
+        entity_registry=MockModule(async_get=async_get_entity_registry),
     ),
     components=MockModule(
         binary_sensor=MockModule(BinarySensorEntity=BinarySensorEntity),
         sensor=MockModule(SensorEntity=SensorEntity),
         switch=MockModule(SwitchEntity=SwitchEntity),
+        select=MockModule(SelectEntity=SelectEntity),
+        button=MockModule(ButtonEntity=ButtonEntity),
     ),
 )
 

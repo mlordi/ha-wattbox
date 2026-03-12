@@ -15,6 +15,7 @@ from custom_components.wattbox.sensor import (
     WattboxFirmwareSensor,
     WattboxHostnameSensor,
     WattboxModelSensor,
+    WattboxOutletAlwaysOnSensor,
     WattboxPowerSensor,
     WattboxSerialSensor,
     WattboxVoltageSensor,
@@ -33,6 +34,7 @@ def mock_config_entry() -> ConfigEntry:
         "password": "test_password",
         "polling_interval": 30,
     }
+    config_entry.options = {}
     return config_entry
 
 
@@ -50,7 +52,10 @@ def mock_coordinator() -> DataUpdateCoordinator:
         "voltage": 120.5,
         "current": 1.2,
         "power": 144.6,
+        "outlet_info": [{"mode": 1, "name": "Outlet 1"}],
     }
+    coordinator.config_entry = MagicMock()
+    coordinator.config_entry.options = {}
     return coordinator
 
 
@@ -72,6 +77,7 @@ async def test_async_setup_entry(
         "voltage": 120.5,
         "current": 1.2,
         "power": 144.6,
+        "outlet_info": [{"mode": 1, "name": "Outlet 1"}],
     }
 
     # Mock the coordinator in hass.data
@@ -88,8 +94,8 @@ async def test_async_setup_entry(
     # Should return None (no return value)
     assert result is None
 
-    # Should have created 7 sensors (4 device info + 3 power monitoring)
-    assert len(entities_added) == 7
+    # Should have created 8 sensors (4 device info + 3 power + 1 always-on)
+    assert len(entities_added) == 8
 
 
 def test_wattbox_firmware_sensor_init(
@@ -341,3 +347,26 @@ def test_sensor_inheritance(
     assert isinstance(voltage_sensor, SensorEntity)
     assert isinstance(current_sensor, SensorEntity)
     assert isinstance(power_sensor, SensorEntity)
+
+
+@pytest.mark.asyncio
+async def test_async_setup_entry_with_none_add_entities(
+    hass: HomeAssistant, mock_config_entry: ConfigEntry
+) -> None:
+    """Test guard when add_entities callback is None."""
+    hass.data["wattbox"] = {mock_config_entry.entry_id: MagicMock()}
+    await async_setup_entry(hass, mock_config_entry, None)
+
+
+def test_always_on_sensor_name_and_value(
+    mock_coordinator: DataUpdateCoordinator,
+) -> None:
+    """Test always-on outlet status sensor naming/value."""
+    mock_coordinator.config_entry.options = {"outlet_1_name": "Rack Core"}
+    sensor = WattboxOutletAlwaysOnSensor(mock_coordinator, "test_entry_id", 1)
+
+    assert sensor.name == "01 Rack Core Status"
+    assert sensor.native_value == "Always On"
+
+    mock_coordinator.data["outlet_info"][0]["mode"] = 0
+    assert sensor.native_value is None
