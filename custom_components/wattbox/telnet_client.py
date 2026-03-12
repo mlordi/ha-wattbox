@@ -18,6 +18,7 @@ from .const import (
     TELNET_CMD_OUTLET_MODE_SET,
     TELNET_CMD_OUTLET_NAME,
     TELNET_CMD_OUTLET_NAME_SET,
+    TELNET_CMD_OUTLET_POWER_STATUS,
     TELNET_CMD_OUTLET_SET,
     TELNET_CMD_OUTLET_STATUS,
     TELNET_CMD_POWER_STATUS,
@@ -535,13 +536,14 @@ class WattboxTelnetClient:
         # Initialize outlet info if not already done
         if not self._device_data["outlet_info"]:
             self._device_data["outlet_info"] = [
-                {"state": 0, "name": f"Outlet {i + 1}", "mode": 0}
+                {"state": 0, "name": f"Outlet {i + 1}", "mode": 0, "power": None}
                 for i in range(num_outlets)
             ]
 
         await self._get_outlet_states()
         await self._get_outlet_names()
         await self._get_outlet_modes()
+        await self._get_outlet_power_statuses()
 
         return self._device_data["outlet_info"]
 
@@ -626,6 +628,39 @@ class WattboxTelnetClient:
             _LOGGER.debug(
                 "Failed to get outlet modes (using existing mode data): %s", e
             )
+
+    async def _get_outlet_power_statuses(self) -> None:
+        """Get per-outlet power status in watts."""
+        for outlet_index in range(len(self._device_data["outlet_info"])):
+            outlet_number = outlet_index + 1
+            try:
+                response = await self.async_send_command(
+                    f"{TELNET_CMD_OUTLET_POWER_STATUS}={outlet_number}"
+                )
+                _LOGGER.debug(
+                    "Outlet power response for outlet %d: %s", outlet_number, response
+                )
+
+                if "=" in response and "OutletPowerStatus" in response:
+                    # Format: ?OutletPowerStatus=1,1.01,0.02,116.50
+                    # Where: outlet, power(w), current(a), voltage(v)
+                    values = response.split("=")[1].split(",")
+                    if len(values) >= 4:
+                        self._device_data["outlet_info"][outlet_index]["power"] = float(
+                            values[1]
+                        )
+                else:
+                    _LOGGER.debug(
+                        "No valid outlet power response found for outlet %d: %s",
+                        outlet_number,
+                        response,
+                    )
+            except Exception as e:
+                _LOGGER.debug(
+                    "Failed to get outlet power for outlet %d: %s",
+                    outlet_number,
+                    e,
+                )
 
     async def async_set_outlet_state(self, outlet_number: int, state: bool) -> None:
         """Set outlet state (on/off)."""

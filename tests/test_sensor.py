@@ -16,6 +16,7 @@ from custom_components.wattbox.sensor import (
     WattboxHostnameSensor,
     WattboxModelSensor,
     WattboxOutletAlwaysOnSensor,
+    WattboxOutletPowerSensor,
     WattboxPowerSensor,
     WattboxSerialSensor,
     WattboxVoltageSensor,
@@ -52,7 +53,7 @@ def mock_coordinator() -> DataUpdateCoordinator:
         "voltage": 120.5,
         "current": 1.2,
         "power": 144.6,
-        "outlet_info": [{"mode": 1, "name": "Outlet 1"}],
+        "outlet_info": [{"mode": 1, "name": "Outlet 1", "power": 6.5}],
     }
     coordinator.config_entry = MagicMock()
     coordinator.config_entry.options = {}
@@ -77,7 +78,7 @@ async def test_async_setup_entry(
         "voltage": 120.5,
         "current": 1.2,
         "power": 144.6,
-        "outlet_info": [{"mode": 1, "name": "Outlet 1"}],
+        "outlet_info": [{"mode": 1, "name": "Outlet 1", "power": 6.5}],
     }
 
     # Mock the coordinator in hass.data
@@ -94,8 +95,8 @@ async def test_async_setup_entry(
     # Should return None (no return value)
     assert result is None
 
-    # Should have created 8 sensors (4 device info + 3 power + 1 always-on)
-    assert len(entities_added) == 8
+    # Should have created 9 sensors (4 device info + 3 power + 1 always-on + 1 outlet power)
+    assert len(entities_added) == 9
 
 
 def test_wattbox_firmware_sensor_init(
@@ -369,4 +370,18 @@ def test_always_on_sensor_name_and_value(
     assert sensor.native_value == "Always On"
 
     mock_coordinator.data["outlet_info"][0]["mode"] = 0
+    assert sensor.native_value is None
+
+
+def test_outlet_power_sensor_name_and_value(
+    mock_coordinator: DataUpdateCoordinator,
+) -> None:
+    """Test outlet power sensor naming/value."""
+    mock_coordinator.config_entry.options = {"outlet_1_name": "Rack Core"}
+    sensor = WattboxOutletPowerSensor(mock_coordinator, "test_entry_id", 1)
+
+    assert sensor.name == "01 Rack Core Power"
+    assert sensor.native_value == 6.5
+
+    mock_coordinator.data["outlet_info"][0]["power"] = None
     assert sensor.native_value is None
