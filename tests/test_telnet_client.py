@@ -283,6 +283,26 @@ async def test_async_set_outlet_state(telnet_client: WattboxTelnetClient) -> Non
 
 
 @pytest.mark.asyncio
+async def test_async_set_outlet_mode(telnet_client: WattboxTelnetClient) -> None:
+    """Test setting outlet mode."""
+    with (
+        patch.object(telnet_client, "async_connect"),
+        patch.object(telnet_client, "async_send_command") as mock_send,
+    ):
+        await telnet_client.async_set_outlet_mode(2, 2)
+        mock_send.assert_called_once_with("!OutletModeSet=2,2")
+
+
+@pytest.mark.asyncio
+async def test_async_set_outlet_mode_invalid(
+    telnet_client: WattboxTelnetClient,
+) -> None:
+    """Test setting invalid outlet mode."""
+    with pytest.raises(ValueError, match="Invalid outlet mode"):
+        await telnet_client.async_set_outlet_mode(1, 99)
+
+
+@pytest.mark.asyncio
 async def test_async_get_power_metrics(telnet_client: WattboxTelnetClient) -> None:
     """Test getting power metrics (placeholder implementation)."""
     metrics = await telnet_client.async_get_power_metrics()

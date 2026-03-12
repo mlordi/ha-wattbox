@@ -186,6 +186,21 @@ async def test_async_set_outlet_state(
 
 
 @pytest.mark.asyncio
+async def test_async_set_outlet_mode(
+    coordinator: WattboxDataUpdateCoordinator,
+    mock_telnet_client: WattboxTelnetClient,
+) -> None:
+    """Test setting outlet mode."""
+    mock_telnet_client.async_set_outlet_mode = AsyncMock()
+    coordinator.async_request_refresh = AsyncMock()
+
+    await coordinator.async_set_outlet_mode(1, 2)
+
+    mock_telnet_client.async_set_outlet_mode.assert_called_once_with(1, 2)
+    coordinator.async_request_refresh.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_async_disconnect(
     coordinator: WattboxDataUpdateCoordinator,
     mock_telnet_client: WattboxTelnetClient,

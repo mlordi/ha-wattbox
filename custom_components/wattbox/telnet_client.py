@@ -14,6 +14,7 @@ from .const import (
     TELNET_CMD_HOSTNAME,
     TELNET_CMD_MODEL,
     TELNET_CMD_OUTLET_COUNT,
+    TELNET_CMD_OUTLET_MODE_SET,
     TELNET_CMD_OUTLET_NAME,
     TELNET_CMD_OUTLET_SET,
     TELNET_CMD_OUTLET_STATUS,
@@ -619,6 +620,22 @@ class WattboxTelnetClient:
 
         except Exception as e:
             _LOGGER.error("Failed to set outlet %d state: %s", outlet_number, e)
+            raise
+
+    async def async_set_outlet_mode(self, outlet_number: int, mode: int) -> None:
+        """Set outlet mode (0=enabled, 1=disabled, 2=reset only)."""
+        if mode not in (0, 1, 2):
+            raise ValueError("Invalid outlet mode; expected one of: 0, 1, 2")
+
+        if not self._connected:
+            await self.async_connect()
+
+        command = f"{TELNET_CMD_OUTLET_MODE_SET}={outlet_number},{mode}"
+        try:
+            await self.async_send_command(command)
+            _LOGGER.debug("Set outlet %d mode to %d", outlet_number, mode)
+        except Exception as e:
+            _LOGGER.error("Failed to set outlet %d mode: %s", outlet_number, e)
             raise
 
     @property
