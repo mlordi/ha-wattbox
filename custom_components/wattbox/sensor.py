@@ -72,10 +72,18 @@ async def async_setup_entry(
         for i, outlet in enumerate(outlet_info)
         if _outlet_mode(config_entry, outlet, i + 1) == 1
     ]
+    outlet_power_sensors = [
+        WattboxOutletPowerSensor(
+            coordinator=coordinator,
+            entry_id=config_entry.entry_id,
+            outlet_number=i + 1,
+        )
+        for i, _outlet in enumerate(outlet_info)
+    ]
 
     # Combine all sensors and filter out any None sensors
     # v0.2.10: Enhanced safety to prevent NoneType errors
-    all_sensors = sensors + power_sensors + always_on_sensors
+    all_sensors = sensors + power_sensors + always_on_sensors + outlet_power_sensors
     valid_sensors = []
     for sensor in all_sensors:
         if sensor is not None:
@@ -301,4 +309,55 @@ class WattboxOutletAlwaysOnSensor(WattboxOutletEntity, SensorEntity):
             )
             if mode == 1:
                 return "Always On"
+        return None
+
+
+class WattboxOutletPowerSensor(WattboxOutletEntity, SensorEntity):
+    """Representation of a Wattbox outlet power sensor."""
+
+    def __init__(
+        self,
+        coordinator: WattboxDataUpdateCoordinator,
+        entry_id: str,
+        outlet_number: int,
+    ) -> None:
+        """Initialize the outlet power sensor."""
+        super().__init__(
+            coordinator,
+            {},
+            f"{entry_id}_outlet_{outlet_number}_power",
+            outlet_number,
+        )
+        self._attr_name = f"Outlet {outlet_number} Power"
+        self._attr_native_unit_of_measurement = UnitOfPower.WATT
+        self._attr_device_class = "power"
+
+    @property
+    def name(self) -> str | None:
+        """Return sensor name."""
+        prefix = f"{self._outlet_number:02d} "
+        configured_name = self.coordinator.config_entry.options.get(
+            f"outlet_{self._outlet_number}_name"
+        )
+        if configured_name:
+            return f"{prefix}{configured_name} Power"
+        if not self.coordinator.data:
+            return f"{prefix}{self._attr_name}"
+        outlet_info = self.coordinator.data.get("outlet_info", [])
+        if self._outlet_number <= len(outlet_info):
+            outlet_name = outlet_info[self._outlet_number - 1].get(
+                "name", f"Outlet {self._outlet_number}"
+            )
+            return f"{prefix}{outlet_name} Power"
+        return f"{prefix}{self._attr_name}"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return outlet power in watts."""
+        if not self.coordinator.data:
+            return None
+        outlet_info = self.coordinator.data.get("outlet_info", [])
+        if self._outlet_number <= len(outlet_info):
+            power_value = outlet_info[self._outlet_number - 1].get("power")
+            return float(power_value) if power_value is not None else None
         return None

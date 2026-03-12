@@ -251,6 +251,21 @@ async def test_async_get_outlet_status(telnet_client: WattboxTelnetClient) -> No
             "?OutletName={Outlet 1},{Outlet 2},{Outlet 3},{Outlet 4},"
             "{Outlet 5},{Outlet 6},{Outlet 7},{Outlet 8},{Outlet 9},"
             "{Outlet 10},{Outlet 11},{Outlet 12}",
+            # Outlet modes
+            "?OutletMode=0,0,0,0,0,0,0,0,0,0,0,0",
+            # Outlet power status for each outlet
+            "?OutletPowerStatus=1,1.10,0.01,120.00",
+            "?OutletPowerStatus=2,0.00,0.00,120.00",
+            "?OutletPowerStatus=3,2.20,0.02,120.00",
+            "?OutletPowerStatus=4,0.00,0.00,120.00",
+            "?OutletPowerStatus=5,1.50,0.01,120.00",
+            "?OutletPowerStatus=6,0.00,0.00,120.00",
+            "?OutletPowerStatus=7,1.20,0.01,120.00",
+            "?OutletPowerStatus=8,0.00,0.00,120.00",
+            "?OutletPowerStatus=9,1.30,0.01,120.00",
+            "?OutletPowerStatus=10,0.00,0.00,120.00",
+            "?OutletPowerStatus=11,1.40,0.01,120.00",
+            "?OutletPowerStatus=12,0.00,0.00,120.00",
         ]
 
         outlets = await telnet_client.async_get_outlet_status()
@@ -258,6 +273,7 @@ async def test_async_get_outlet_status(telnet_client: WattboxTelnetClient) -> No
         assert len(outlets) == 12
         assert outlets[0]["state"] == 1
         assert outlets[0]["name"] == "Outlet 1"
+        assert outlets[0]["power"] == 1.1
         assert outlets[1]["state"] == 0
         assert outlets[1]["name"] == "Outlet 2"
 
