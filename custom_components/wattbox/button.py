@@ -18,6 +18,20 @@ from .entity import WattboxOutletEntity
 _LOGGER = logging.getLogger(__name__)
 
 
+def _outlet_mode(
+    config_entry: ConfigEntry,
+    outlet: dict[str, Any],
+    outlet_number: int,
+) -> int:
+    """Resolve outlet mode from options first, then coordinator data."""
+    return int(
+        config_entry.options.get(
+            f"outlet_{outlet_number}_mode",
+            outlet.get("mode", 0),
+        )
+    )
+
+
 def _create_outlet_reset_buttons(
     coordinator: WattboxDataUpdateCoordinator,
     config_entry: ConfigEntry,
@@ -26,15 +40,16 @@ def _create_outlet_reset_buttons(
     """Create reset button entities for outlets."""
     buttons = []
     for i, outlet in enumerate(outlet_info):
-        if outlet.get("mode", 0) == 1:
+        outlet_number = i + 1
+        if _outlet_mode(config_entry, outlet, outlet_number) == 1:
             continue
         button = WattboxOutletResetButton(
             coordinator=coordinator,
             device_info=(
                 coordinator.data.get("device_info", {}) if coordinator.data else {}
             ),
-            unique_id=f"{config_entry.entry_id}_outlet_{i + 1}_reset",
-            outlet_number=i + 1,
+            unique_id=f"{config_entry.entry_id}_outlet_{outlet_number}_reset",
+            outlet_number=outlet_number,
         )
         buttons.append(button)
     return buttons

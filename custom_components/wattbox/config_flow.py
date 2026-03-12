@@ -173,7 +173,10 @@ class WattboxOptionsFlow(config_entries.OptionsFlow):
             )
             current_mode = outlet.get(
                 "mode",
-                self._config_entry.options.get(f"outlet_{i}_mode", 0),
+                0,
+            )
+            current_mode = int(
+                self._config_entry.options.get(f"outlet_{i}_mode", current_mode)
             )
 
             schema_fields[vol.Optional(f"outlet_{i}_name", default=current_name)] = str
@@ -199,14 +202,25 @@ class WattboxOptionsFlow(config_entries.OptionsFlow):
                     ),
                 )
             ).strip()
-            new_mode = int(user_input.get(f"outlet_{i}_mode", outlet.get("mode", 0)))
+            new_mode = int(
+                user_input.get(
+                    f"outlet_{i}_mode",
+                    self._config_entry.options.get(
+                        f"outlet_{i}_mode", outlet.get("mode", 0)
+                    ),
+                )
+            )
 
             current_name = str(
                 self._config_entry.options.get(
                     f"outlet_{i}_name", outlet.get("name", "")
                 )
             ).strip()
-            current_mode = int(outlet.get("mode", 0))
+            current_mode = int(
+                self._config_entry.options.get(
+                    f"outlet_{i}_mode", outlet.get("mode", 0)
+                )
+            )
 
             if new_name and new_name != current_name:
                 # Device protocol does not reliably accept spaces in names.

@@ -19,6 +19,20 @@ from .entity import WattboxOutletEntity
 _LOGGER = logging.getLogger(__name__)
 
 
+def _outlet_mode(
+    config_entry: ConfigEntry,
+    outlet: dict[str, Any],
+    outlet_number: int,
+) -> int:
+    """Resolve outlet mode from options first, then coordinator data."""
+    return int(
+        config_entry.options.get(
+            f"outlet_{outlet_number}_mode",
+            outlet.get("mode", 0),
+        )
+    )
+
+
 def _create_outlet_switches(
     coordinator: WattboxDataUpdateCoordinator,
     config_entry: ConfigEntry,
@@ -27,15 +41,16 @@ def _create_outlet_switches(
     """Create WattboxSwitch instances for outlets."""
     switches = []
     for i, outlet in enumerate(outlet_info):
-        if outlet.get("mode", 0) != 0:
+        outlet_number = i + 1
+        if _outlet_mode(config_entry, outlet, outlet_number) != 0:
             continue
         switch = WattboxSwitch(
             coordinator=coordinator,
             device_info=(
                 coordinator.data.get("device_info", {}) if coordinator.data else {}
             ),
-            unique_id=f"{config_entry.entry_id}_outlet_{i + 1}",
-            outlet_number=i + 1,
+            unique_id=f"{config_entry.entry_id}_outlet_{outlet_number}",
+            outlet_number=outlet_number,
         )
         switches.append(switch)
     return switches
@@ -143,25 +158,48 @@ class WattboxSwitch(WattboxOutletEntity, SwitchEntity):
         outlet_info = self.coordinator.data.get("outlet_info", [])
         if self._outlet_number <= len(outlet_info):
             # Reset Only mode does not support ON/OFF operations.
-            return outlet_info[self._outlet_number - 1].get("mode", 0) != 2
+            mode = _outlet_mode(
+                self.coordinator.config_entry,
+                outlet_info[self._outlet_number - 1],
+                self._outlet_number,
+            )
+            return mode == 0
         return True
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
-        outlet_info = self.coordinator.data.get("outlet_info", []) if self.coordinator.data else []
+        outlet_info = (
+            self.coordinator.data.get("outlet_info", [])
+            if self.coordinator.data
+            else []
+        )
         if self._outlet_number <= len(outlet_info):
-            if outlet_info[self._outlet_number - 1].get("mode", 0) == 2:
+            mode = _outlet_mode(
+                self.coordinator.config_entry,
+                outlet_info[self._outlet_number - 1],
+                self._outlet_number,
+            )
+            if mode != 0:
                 raise HomeAssistantError(
-                    "Outlet is set to Reset Only mode. Use the outlet reset button entity."
+                    "Outlet is not in Enabled mode. Use integration Configure to change mode."
                 )
         await self.coordinator.async_set_outlet_state(self._outlet_number, True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
-        outlet_info = self.coordinator.data.get("outlet_info", []) if self.coordinator.data else []
+        outlet_info = (
+            self.coordinator.data.get("outlet_info", [])
+            if self.coordinator.data
+            else []
+        )
         if self._outlet_number <= len(outlet_info):
-            if outlet_info[self._outlet_number - 1].get("mode", 0) == 2:
+            mode = _outlet_mode(
+                self.coordinator.config_entry,
+                outlet_info[self._outlet_number - 1],
+                self._outlet_number,
+            )
+            if mode != 0:
                 raise HomeAssistantError(
-                    "Outlet is set to Reset Only mode. Use the outlet reset button entity."
+                    "Outlet is not in Enabled mode. Use integration Configure to change mode."
                 )
         await self.coordinator.async_set_outlet_state(self._outlet_number, False)
