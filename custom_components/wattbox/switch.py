@@ -27,7 +27,7 @@ def _create_outlet_switches(
     """Create WattboxSwitch instances for outlets."""
     switches = []
     for i, outlet in enumerate(outlet_info):
-        if outlet.get("mode", 0) == 2:
+        if outlet.get("mode", 0) != 0:
             continue
         switch = WattboxSwitch(
             coordinator=coordinator,
