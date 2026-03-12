@@ -94,6 +94,19 @@ class WattboxOutletModeSelect(WattboxOutletEntity, SelectEntity):
         self._attr_options = list(MODE_LABEL_TO_VALUE.keys())
 
     @property
+    def name(self) -> str | None:
+        """Return the name of the select entity."""
+        if not self.coordinator.data:
+            return self._attr_name
+        outlet_info = self.coordinator.data.get("outlet_info", [])
+        if self._outlet_number <= len(outlet_info):
+            outlet_name = outlet_info[self._outlet_number - 1].get(
+                "name", f"Outlet {self._outlet_number}"
+            )
+            return f"{outlet_name} Mode"
+        return self._attr_name
+
+    @property
     def current_option(self) -> str | None:
         """Return current outlet mode option."""
         if not self.coordinator.data:

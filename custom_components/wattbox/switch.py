@@ -104,6 +104,18 @@ class WattboxSwitch(WattboxOutletEntity, SwitchEntity):
         self._attr_device_class = "outlet"
 
     @property
+    def name(self) -> str | None:
+        """Return the name of the switch."""
+        if not self.coordinator.data:
+            return self._attr_name
+        outlet_info = self.coordinator.data.get("outlet_info", [])
+        if self._outlet_number <= len(outlet_info):
+            return outlet_info[self._outlet_number - 1].get(
+                "name", f"Outlet {self._outlet_number}"
+            )
+        return self._attr_name
+
+    @property
     def is_on(self) -> bool | None:
         """Return true if the switch is on."""
         if not self.coordinator.data:

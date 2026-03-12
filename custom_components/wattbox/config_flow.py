@@ -127,6 +127,80 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         # Final fallback to host
         return f"Wattbox {host}"
 
+    @staticmethod
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> config_entries.OptionsFlow:
+        """Get the options flow for this handler."""
+        return WattboxOptionsFlow(config_entry)
+
+
+class WattboxOptionsFlow(config_entries.OptionsFlow):
+    """Handle Wattbox options flow."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self._config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the options."""
+        if user_input is None:
+            return self.async_show_form(
+                step_id="init", data_schema=self._build_options_schema()
+            )
+
+        await self._apply_outlet_settings(user_input)
+        return self.async_create_entry(title="", data=user_input)
+
+    def _build_options_schema(self) -> vol.Schema:
+        """Build dynamic options schema with per-outlet mode and name."""
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
+        outlet_info = coordinator.data.get("outlet_info", []) if coordinator and coordinator.data else []
+        if not outlet_info:
+            outlet_info = [{"name": f"Outlet {i + 1}", "mode": 0} for i in range(18)]
+
+        schema_fields: dict[Any, Any] = {}
+        for i, outlet in enumerate(outlet_info, start=1):
+            current_name = outlet.get(
+                "name",
+                self._config_entry.options.get(f"outlet_{i}_name", f"Outlet {i}"),
+            )
+            current_mode = outlet.get(
+                "mode",
+                self._config_entry.options.get(f"outlet_{i}_mode", 0),
+            )
+
+            schema_fields[vol.Optional(f"outlet_{i}_name", default=current_name)] = str
+            schema_fields[vol.Optional(f"outlet_{i}_mode", default=current_mode)] = vol.In(
+                {0: "Enabled", 1: "Disabled", 2: "Reset Only"}
+            )
+
+        return vol.Schema(schema_fields)
+
+    async def _apply_outlet_settings(self, user_input: dict[str, Any]) -> None:
+        """Apply changed outlet names and modes to device."""
+        coordinator = self.hass.data.get(DOMAIN, {}).get(self._config_entry.entry_id)
+        if not coordinator or not coordinator.data:
+            return
+
+        outlet_info = coordinator.data.get("outlet_info", [])
+        for i, outlet in enumerate(outlet_info, start=1):
+            new_name = str(user_input.get(f"outlet_{i}_name", outlet.get("name", ""))).strip()
+            new_mode = int(user_input.get(f"outlet_{i}_mode", outlet.get("mode", 0)))
+
+            current_name = str(outlet.get("name", "")).strip()
+            current_mode = int(outlet.get("mode", 0))
+
+            if new_name and new_name != current_name:
+                await coordinator.telnet_client.async_set_outlet_name(i, new_name)
+
+            if new_mode != current_mode:
+                await coordinator.telnet_client.async_set_outlet_mode(i, new_mode)
+
+        await coordinator.async_request_refresh()
+
 
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""

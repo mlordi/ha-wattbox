@@ -16,6 +16,7 @@ from .const import (
     TELNET_CMD_OUTLET_COUNT,
     TELNET_CMD_OUTLET_MODE_SET,
     TELNET_CMD_OUTLET_NAME,
+    TELNET_CMD_OUTLET_NAME_SET,
     TELNET_CMD_OUTLET_SET,
     TELNET_CMD_OUTLET_STATUS,
     TELNET_CMD_POWER_STATUS,
@@ -656,6 +657,35 @@ class WattboxTelnetClient:
                 )
         except Exception as e:
             _LOGGER.error("Failed to set outlet %d mode: %s", outlet_number, e)
+            raise
+
+    async def async_set_outlet_name(self, outlet_number: int, name: str) -> None:
+        """Set outlet name."""
+        clean_name = name.strip()
+        if not clean_name:
+            raise ValueError("Outlet name cannot be empty")
+        if len(clean_name) > 31:
+            raise ValueError("Outlet name cannot exceed 31 characters")
+        if "," in clean_name:
+            raise ValueError("Outlet name cannot contain commas")
+
+        if not self._connected:
+            await self.async_connect()
+
+        command = f"{TELNET_CMD_OUTLET_NAME_SET}={outlet_number},{clean_name}"
+        try:
+            await self.async_send_command(command)
+            _LOGGER.debug("Set outlet %d name to %s", outlet_number, clean_name)
+
+            if 1 <= outlet_number <= len(self._device_data["outlet_info"]):
+                self._device_data["outlet_info"][outlet_number - 1]["name"] = clean_name
+                _LOGGER.debug(
+                    "Updated internal name for outlet %d to %s",
+                    outlet_number,
+                    clean_name,
+                )
+        except Exception as e:
+            _LOGGER.error("Failed to set outlet %d name: %s", outlet_number, e)
             raise
 
     @property

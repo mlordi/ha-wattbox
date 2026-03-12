@@ -85,6 +85,19 @@ class WattboxOutletResetButton(WattboxOutletEntity, ButtonEntity):
         super().__init__(coordinator, device_info, unique_id, outlet_number)
         self._attr_name = f"Outlet {outlet_number} Reset"
 
+    @property
+    def name(self) -> str | None:
+        """Return the name of the reset button."""
+        if not self.coordinator.data:
+            return self._attr_name
+        outlet_info = self.coordinator.data.get("outlet_info", [])
+        if self._outlet_number <= len(outlet_info):
+            outlet_name = outlet_info[self._outlet_number - 1].get(
+                "name", f"Outlet {self._outlet_number}"
+            )
+            return f"{outlet_name} Reset"
+        return self._attr_name
+
     async def async_press(self) -> None:
         """Handle the button press."""
         await self.coordinator.async_reset_outlet(self._outlet_number)
