@@ -18,6 +18,20 @@ from .entity import WattboxDeviceEntity, WattboxOutletEntity
 _LOGGER = logging.getLogger(__name__)
 
 
+def _outlet_mode(
+    config_entry: ConfigEntry,
+    outlet: dict,
+    outlet_number: int,
+) -> int:
+    """Resolve outlet mode from options first, then coordinator data."""
+    return int(
+        config_entry.options.get(
+            f"outlet_{outlet_number}_mode",
+            outlet.get("mode", 0),
+        )
+    )
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -56,7 +70,7 @@ async def async_setup_entry(
             outlet_number=i + 1,
         )
         for i, outlet in enumerate(outlet_info)
-        if outlet.get("mode", 0) == 1
+        if _outlet_mode(config_entry, outlet, i + 1) == 1
     ]
 
     # Combine all sensors and filter out any None sensors
@@ -278,6 +292,12 @@ class WattboxOutletAlwaysOnSensor(WattboxOutletEntity, SensorEntity):
             return None
         outlet_info = self.coordinator.data.get("outlet_info", [])
         if self._outlet_number <= len(outlet_info):
-            if outlet_info[self._outlet_number - 1].get("mode", 0) == 1:
+            mode = int(
+                self.coordinator.config_entry.options.get(
+                    f"outlet_{self._outlet_number}_mode",
+                    outlet_info[self._outlet_number - 1].get("mode", 0),
+                )
+            )
+            if mode == 1:
                 return "Always On"
         return None

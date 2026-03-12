@@ -68,9 +68,13 @@ ATTR_HOSTNAME: Final[str] = "hostname"
 
 # Services
 SERVICE_SET_OUTLET_MODE: Final[str] = "set_outlet_mode"
+SERVICE_SET_OUTLET_STATE: Final[str] = "set_outlet_state"
+SERVICE_TOGGLE_OUTLET: Final[str] = "toggle_outlet"
+SERVICE_RESET_OUTLET: Final[str] = "reset_outlet"
 SERVICE_ATTR_ENTRY_ID: Final[str] = "entry_id"
 SERVICE_ATTR_OUTLET_NUMBER: Final[str] = "outlet_number"
 SERVICE_ATTR_MODE: Final[str] = "mode"
+SERVICE_ATTR_STATE: Final[str] = "state"
 
 # Outlet modes
 OUTLET_MODE_ENABLED: Final[int] = 0

@@ -22,7 +22,11 @@ from .const import (
     SERVICE_ATTR_ENTRY_ID,
     SERVICE_ATTR_MODE,
     SERVICE_ATTR_OUTLET_NUMBER,
+    SERVICE_ATTR_STATE,
+    SERVICE_RESET_OUTLET,
+    SERVICE_SET_OUTLET_STATE,
     SERVICE_SET_OUTLET_MODE,
+    SERVICE_TOGGLE_OUTLET,
 )
 from .coordinator import WattboxDataUpdateCoordinator
 from .telnet_client import WattboxTelnetClient
@@ -38,11 +42,12 @@ PLATFORMS: list[Platform] = [
 
 
 def _stale_unique_ids_for_entry(
-    entry_id: str,
+    entry: ConfigEntry,
     outlet_info: list[dict],
 ) -> set[str]:
     """Build list of stale unique_ids to remove from entity registry."""
     stale_unique_ids: set[str] = set()
+    entry_id = entry.entry_id
 
     # Remove all old mode select entities (mode is now configured in Options Flow).
     for i in range(1, len(outlet_info) + 1):
@@ -53,7 +58,7 @@ def _stale_unique_ids_for_entry(
     # mode 1: no switch/button, show always-on status
     # mode 2: no switch, show reset button, no always-on status
     for i, outlet in enumerate(outlet_info, start=1):
-        mode = outlet.get("mode", 0)
+        mode = int(entry.options.get(f"outlet_{i}_mode", outlet.get("mode", 0)))
         if mode in (1, 2):
             stale_unique_ids.add(f"{entry_id}_outlet_{i}")
         if mode == 1:
@@ -71,7 +76,7 @@ def _cleanup_stale_entities(
 ) -> None:
     """Remove stale entities from HA entity registry."""
     entity_registry = er.async_get(hass)
-    stale_unique_ids = _stale_unique_ids_for_entry(entry.entry_id, outlet_info)
+    stale_unique_ids = _stale_unique_ids_for_entry(entry, outlet_info)
     if not stale_unique_ids:
         return
 
@@ -139,6 +144,141 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             schema=service_schema,
         )
 
+    def _get_outlet_mode(
+        coordinator_for_entry: WattboxDataUpdateCoordinator, outlet_number: int
+    ) -> int:
+        outlet_info = (
+            coordinator_for_entry.data.get("outlet_info", [])
+            if coordinator_for_entry.data
+            else []
+        )
+        outlet = (
+            outlet_info[outlet_number - 1]
+            if 1 <= outlet_number <= len(outlet_info)
+            else {}
+        )
+        return int(
+            coordinator_for_entry.config_entry.options.get(
+                f"outlet_{outlet_number}_mode",
+                outlet.get("mode", 0),
+            )
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_SET_OUTLET_STATE):
+        state_schema = vol.Schema(
+            {
+                vol.Required(SERVICE_ATTR_ENTRY_ID): str,
+                vol.Required(SERVICE_ATTR_OUTLET_NUMBER): vol.All(
+                    vol.Coerce(int), vol.Range(min=1)
+                ),
+                vol.Required(SERVICE_ATTR_STATE): bool,
+            }
+        )
+
+        async def handle_set_outlet_state(call: ServiceCall) -> None:
+            entry_id = call.data[SERVICE_ATTR_ENTRY_ID]
+            outlet_number = call.data[SERVICE_ATTR_OUTLET_NUMBER]
+            state = call.data[SERVICE_ATTR_STATE]
+
+            coordinator_for_entry = hass.data[DOMAIN].get(entry_id)
+            if coordinator_for_entry is None:
+                raise HomeAssistantError(
+                    f"Unknown Wattbox entry_id '{entry_id}' for service call"
+                )
+
+            if _get_outlet_mode(coordinator_for_entry, outlet_number) != 0:
+                raise HomeAssistantError(
+                    "Outlet is not in Enabled mode; cannot set ON/OFF state."
+                )
+
+            await coordinator_for_entry.async_set_outlet_state(outlet_number, state)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_SET_OUTLET_STATE,
+            handle_set_outlet_state,
+            schema=state_schema,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_TOGGLE_OUTLET):
+        toggle_schema = vol.Schema(
+            {
+                vol.Required(SERVICE_ATTR_ENTRY_ID): str,
+                vol.Required(SERVICE_ATTR_OUTLET_NUMBER): vol.All(
+                    vol.Coerce(int), vol.Range(min=1)
+                ),
+            }
+        )
+
+        async def handle_toggle_outlet(call: ServiceCall) -> None:
+            entry_id = call.data[SERVICE_ATTR_ENTRY_ID]
+            outlet_number = call.data[SERVICE_ATTR_OUTLET_NUMBER]
+
+            coordinator_for_entry = hass.data[DOMAIN].get(entry_id)
+            if coordinator_for_entry is None:
+                raise HomeAssistantError(
+                    f"Unknown Wattbox entry_id '{entry_id}' for service call"
+                )
+
+            if _get_outlet_mode(coordinator_for_entry, outlet_number) != 0:
+                raise HomeAssistantError(
+                    "Outlet is not in Enabled mode; cannot toggle state."
+                )
+
+            outlet_info = (
+                coordinator_for_entry.data.get("outlet_info", [])
+                if coordinator_for_entry.data
+                else []
+            )
+            current_is_on = False
+            if 1 <= outlet_number <= len(outlet_info):
+                current_is_on = bool(outlet_info[outlet_number - 1].get("state", 0))
+
+            await coordinator_for_entry.async_set_outlet_state(
+                outlet_number, not current_is_on
+            )
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_TOGGLE_OUTLET,
+            handle_toggle_outlet,
+            schema=toggle_schema,
+        )
+
+    if not hass.services.has_service(DOMAIN, SERVICE_RESET_OUTLET):
+        reset_schema = vol.Schema(
+            {
+                vol.Required(SERVICE_ATTR_ENTRY_ID): str,
+                vol.Required(SERVICE_ATTR_OUTLET_NUMBER): vol.All(
+                    vol.Coerce(int), vol.Range(min=1)
+                ),
+            }
+        )
+
+        async def handle_reset_outlet(call: ServiceCall) -> None:
+            entry_id = call.data[SERVICE_ATTR_ENTRY_ID]
+            outlet_number = call.data[SERVICE_ATTR_OUTLET_NUMBER]
+
+            coordinator_for_entry = hass.data[DOMAIN].get(entry_id)
+            if coordinator_for_entry is None:
+                raise HomeAssistantError(
+                    f"Unknown Wattbox entry_id '{entry_id}' for service call"
+                )
+
+            if _get_outlet_mode(coordinator_for_entry, outlet_number) == 1:
+                raise HomeAssistantError(
+                    "Outlet is in Disabled mode; reset action is not available."
+                )
+
+            await coordinator_for_entry.async_reset_outlet(outlet_number)
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_RESET_OUTLET,
+            handle_reset_outlet,
+            schema=reset_schema,
+        )
+
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -158,5 +298,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if not hass.data.get(DOMAIN):
         hass.services.async_remove(DOMAIN, SERVICE_SET_OUTLET_MODE)
+        hass.services.async_remove(DOMAIN, SERVICE_SET_OUTLET_STATE)
+        hass.services.async_remove(DOMAIN, SERVICE_TOGGLE_OUTLET)
+        hass.services.async_remove(DOMAIN, SERVICE_RESET_OUTLET)
 
     return unload_ok
