@@ -70,7 +70,10 @@ async def async_setup_entry(
     coordinator: WattboxDataUpdateCoordinator = hass.data[DOMAIN][config_entry.entry_id]
     outlet_info = coordinator.data.get("outlet_info", []) if coordinator.data else []
     if not outlet_info:
-        outlet_info = [{"state": 0} for _ in range(18)]
+        outlet_count = (
+            coordinator.data.get("outlet_count", 12) if coordinator.data else 12
+        )
+        outlet_info = [{"state": 0} for _ in range(outlet_count)]
 
     buttons = _create_outlet_reset_buttons(coordinator, config_entry, outlet_info)
     valid_buttons = [button for button in buttons if button is not None]

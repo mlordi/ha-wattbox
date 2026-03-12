@@ -51,8 +51,8 @@ class WattboxDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Get device info
             device_info = await self.telnet_client.async_get_device_info()
 
-            # Get outlet status (assuming 18 outlets for 800 series)
-            outlet_info = await self.telnet_client.async_get_outlet_status(18)
+            # Get outlet status using detected outlet count from the device.
+            outlet_info = await self.telnet_client.async_get_outlet_status()
 
             # Get status monitoring data (includes power status via telnet)
             status_info = await self.telnet_client.async_get_status_info()
@@ -66,6 +66,7 @@ class WattboxDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return {
                 "device_info": device_info,
                 "outlet_info": outlet_info,
+                "outlet_count": len(outlet_info),
                 "voltage": voltage,
                 "current": current,
                 "power": power,

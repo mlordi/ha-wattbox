@@ -41,6 +41,36 @@ PLATFORMS: list[Platform] = [
 ]
 
 
+def _build_initial_outlet_options(
+    entry: ConfigEntry,
+    outlet_info: list[dict],
+) -> dict:
+    """Build initial options from detected outlet data."""
+    options = dict(entry.options)
+    changed = False
+
+    detected_count = len(outlet_info)
+    if options.get("outlet_count") != detected_count:
+        options["outlet_count"] = detected_count
+        changed = True
+
+    for i, outlet in enumerate(outlet_info, start=1):
+        name_key = f"outlet_{i}_name"
+        mode_key = f"outlet_{i}_mode"
+
+        detected_name = outlet.get("name", f"Outlet {i}")
+        detected_mode = int(outlet.get("mode", 0))
+
+        if name_key not in options and detected_name:
+            options[name_key] = detected_name
+            changed = True
+        if mode_key not in options:
+            options[mode_key] = detected_mode
+            changed = True
+
+    return options if changed else {}
+
+
 def _stale_unique_ids_for_entry(
     entry: ConfigEntry,
     outlet_info: list[dict],
@@ -108,6 +138,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = coordinator
 
     outlet_info = coordinator.data.get("outlet_info", []) if coordinator.data else []
+
+    initial_options = _build_initial_outlet_options(entry, outlet_info)
+    if initial_options:
+        hass.config_entries.async_update_entry(entry, options=initial_options)
+
     _cleanup_stale_entities(hass, entry, outlet_info)
 
     if not hass.services.has_service(DOMAIN, SERVICE_SET_OUTLET_MODE):

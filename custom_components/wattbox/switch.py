@@ -82,8 +82,10 @@ async def async_setup_entry(
     # This ensures entities are created even before first data fetch
     if not outlet_info:
         _LOGGER.info("No outlet data available yet, creating default switches")
-        # Create switches for 18 outlets (typical for 800 series)
-        outlet_info = [{"state": 0} for _ in range(18)]
+        outlet_count = (
+            coordinator.data.get("outlet_count", 12) if coordinator.data else 12
+        )
+        outlet_info = [{"state": 0} for _ in range(outlet_count)]
 
     # Create switches for each outlet
     switches = _create_outlet_switches(coordinator, config_entry, outlet_info)
