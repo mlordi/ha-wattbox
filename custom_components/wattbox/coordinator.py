@@ -101,6 +101,15 @@ class WattboxDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             raise
 
+    async def async_reset_outlet(self, outlet_number: int) -> None:
+        """Reset outlet."""
+        try:
+            await self.telnet_client.async_reset_outlet(outlet_number)
+            await self.async_request_refresh()
+        except Exception as err:
+            _LOGGER.error("Failed to reset outlet %d: %s", outlet_number, err)
+            raise
+
     async def async_disconnect(self) -> None:
         """Disconnect from the device."""
         await self.telnet_client.async_disconnect()

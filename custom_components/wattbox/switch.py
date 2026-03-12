@@ -9,6 +9,7 @@ from typing import Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -113,10 +114,35 @@ class WattboxSwitch(WattboxOutletEntity, SwitchEntity):
             return bool(outlet.get("state", 0))
         return None
 
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        if not super().available:
+            return False
+        if not self.coordinator.data:
+            return True
+        outlet_info = self.coordinator.data.get("outlet_info", [])
+        if self._outlet_number <= len(outlet_info):
+            # Reset Only mode does not support ON/OFF operations.
+            return outlet_info[self._outlet_number - 1].get("mode", 0) != 2
+        return True
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the switch on."""
+        outlet_info = self.coordinator.data.get("outlet_info", []) if self.coordinator.data else []
+        if self._outlet_number <= len(outlet_info):
+            if outlet_info[self._outlet_number - 1].get("mode", 0) == 2:
+                raise HomeAssistantError(
+                    "Outlet is set to Reset Only mode. Use the outlet reset button entity."
+                )
         await self.coordinator.async_set_outlet_state(self._outlet_number, True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the switch off."""
+        outlet_info = self.coordinator.data.get("outlet_info", []) if self.coordinator.data else []
+        if self._outlet_number <= len(outlet_info):
+            if outlet_info[self._outlet_number - 1].get("mode", 0) == 2:
+                raise HomeAssistantError(
+                    "Outlet is set to Reset Only mode. Use the outlet reset button entity."
+                )
         await self.coordinator.async_set_outlet_state(self._outlet_number, False)

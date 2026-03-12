@@ -623,6 +623,19 @@ class WattboxTelnetClient:
             _LOGGER.error("Failed to set outlet %d state: %s", outlet_number, e)
             raise
 
+    async def async_reset_outlet(self, outlet_number: int) -> None:
+        """Reset outlet."""
+        if not self._connected:
+            await self.async_connect()
+
+        command = f"{TELNET_CMD_OUTLET_SET}={outlet_number},RESET"
+        try:
+            await self.async_send_command(command)
+            _LOGGER.debug("Reset outlet %d", outlet_number)
+        except Exception as e:
+            _LOGGER.error("Failed to reset outlet %d: %s", outlet_number, e)
+            raise
+
     async def async_set_outlet_mode(self, outlet_number: int, mode: int) -> None:
         """Set outlet mode (0=enabled, 1=disabled, 2=reset only)."""
         if mode not in (0, 1, 2):
