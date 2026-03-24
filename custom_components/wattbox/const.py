@@ -20,7 +20,7 @@ DEFAULT_USERNAME: Final[str] = "wattbox"
 DEFAULT_PASSWORD: Final[str] = "wattbox"
 
 # Telnet configuration
-TELNET_PORT: Final[int] = 23
+TELNET_PORT: Final[int] = 22
 TELNET_TIMEOUT: Final[int] = 10
 
 # Telnet commands
